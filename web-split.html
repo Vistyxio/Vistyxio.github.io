@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>屏幕等分网页多开工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        neutral: '#F5F7FA',
+                        dark: '#1D2129',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .grid-item-hover {
+                @apply hover:border-primary hover:shadow-lg transition-all duration-300;
+            }
+            .config-input {
+                @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+            }
+            .btn-primary {
+                @apply bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 active:bg-primary/80 transition-all duration-200;
+            }
+            .btn-secondary {
+                @apply bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-all duration-200;
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral min-h-screen font-sans text-dark m-0 p-0">
+    <!-- 顶部配置栏 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 px-4 py-3 md:px-6 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-window-maximize text-primary text-2xl"></i>
+            <h1 class="text-xl md:text-2xl font-bold">屏幕等分网页多开工具</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 whitespace-nowrap">
+            <!-- 修复：使用whitespace-nowrap防止换行 -->
+            <div class="flex items-center gap-2 whitespace-nowrap">
+                <label for="grid-count" class="font-medium">等分数量：</label>
+                <select id="grid-count" class="config-input w-32">
+                    <option value="4">4等分</option>
+                    <option value="8">8等分</option>
+                    <option value="16" selected>16等分</option>
+                    <option value="32">32等分</option>
+                </select>
+            </div>
+            <button id="reset-btn" class="btn-secondary flex items-center gap-1">
+                <i class="fa-solid fa-refresh"></i> 重置
+            </button>
+        </div>
+    </header>
+
+    <!-- 修复：移除container和mx-auto，让内容占满屏幕宽度 -->
+    <main class="px-4 py-6 md:py-8 w-full">
+        <div id="grid-container" class="grid gap-2 bg-white p-2 rounded-lg shadow-sm min-h-[calc(100vh-180px)] w-full"></div>
+    </main>
+
+    <script>
+        const gridContainer = document.getElementById('grid-container');
+        const gridCountSelect = document.getElementById('grid-count');
+        const resetBtn = document.getElementById('reset-btn');
+        const CONFIG_KEY = 'web_grid_config';
+
+        // 初始化：从本地存储加载配置
+        function init() {
+            const savedConfig = localStorage.getItem(CONFIG_KEY);
+            if (savedConfig) {
+                const { count, urls } = JSON.parse(savedConfig);
+                gridCountSelect.value = count;
+                initGrid(count, urls);
+            } else {
+                initGrid(16);
+            }
+        }
+
+        // 初始化网格
+        function initGrid(count, savedUrls = {}) {
+            gridContainer.innerHTML = '';
+            setGridTemplate(count);
+            for (let i = 0; i < count; i++) {
+                createGridItem(i + 1, savedUrls[i + 1] || '');
+            }
+        }
+
+        // 设置网格布局
+        function setGridTemplate(count) {
+            let gridTemplate = '';
+            switch (count) {
+                case 4: gridTemplate = 'grid-cols-2 grid-rows-2'; break;
+                case 8: gridTemplate = 'grid-cols-4 grid-rows-2'; break;
+                case 16: gridTemplate = 'grid-cols-4 grid-rows-4'; break;
+                case 32: gridTemplate = 'grid-cols-8 grid-rows-4'; break;
+                default: gridTemplate = 'grid-cols-2 grid-rows-2';
+            }
+            gridContainer.className = `grid gap-2 bg-white p-2 rounded-lg shadow-sm min-h-[calc(100vh-180px)] w-full ${gridTemplate}`;
+        }
+
+        // 创建网格项
+        function createGridItem(index, savedUrl) {
+            const gridItem = document.createElement('div');
+            gridItem.className = 'grid-item-hover border border-gray-200 rounded-lg overflow-hidden relative min-h-0';
+            gridItem.innerHTML = `
+                <div class="config-panel absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-3 z-10">
+                    <div class="w-full mb-2 text-center font-medium">窗口 ${index}</div>
+                    <input type="url" placeholder="请输入网页链接（如https://www.baidu.com）" 
+                           class="config-input mb-3 text-sm" value="${savedUrl}" required>
+                    <button class="btn-primary w-full text-sm flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-link"></i> 打开链接
+                    </button>
+                </div>
+                <iframe class="iframe-content absolute inset-0 w-full h-full border-0 hidden" frameborder="0"></iframe>
+                <div class="absolute top-2 right-2 flex gap-1 z-20 hidden">
+                    <button class="refresh-btn w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-all">
+                        <i class="fa-solid fa-refresh text-xs"></i>
+                    </button>
+                    <button class="close-btn w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-all">
+                        <i class="fa-solid fa-times text-xs"></i>
+                    </button>
+                </div>
+            `;
+            gridContainer.appendChild(gridItem);
+
+            const configPanel = gridItem.querySelector('.config-panel');
+            const urlInput = gridItem.querySelector('input[type="url"]');
+            const openBtn = gridItem.querySelector('.btn-primary');
+            const iframe = gridItem.querySelector('.iframe-content');
+            const closeBtn = gridItem.querySelector('.close-btn');
+            const refreshBtn = gridItem.querySelector('.refresh-btn');
+            const controls = gridItem.querySelector('.absolute.top-2');
+
+            // 打开链接
+            openBtn.addEventListener('click', () => {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert(`请为窗口 ${index} 输入有效链接！`);
+                    urlInput.focus();
+                    return;
+                }
+                const validUrl = url.startsWith('http') ? url : `https://${url}`;
+                iframe.src = validUrl;
+                iframe.classList.remove('hidden');
+                configPanel.classList.add('hidden');
+                controls.classList.remove('hidden');
+                saveConfig();
+            });
+
+            // 关闭窗口
+            closeBtn.addEventListener('click', () => {
+                iframe.src = 'about:blank';
+                iframe.classList.add('hidden');
+                configPanel.classList.remove('hidden');
+                controls.classList.add('hidden');
+                urlInput.value = '';
+                saveConfig();
+            });
+
+            // 刷新窗口
+            refreshBtn.addEventListener('click', () => {
+                if (iframe.src && iframe.src !== 'about:blank') {
+                    iframe.src = iframe.src;
+                }
+            });
+
+            // 回车打开
+            urlInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') openBtn.click();
+            });
+        }
+
+        // 保存配置到localStorage
+        function saveConfig() {
+            const count = parseInt(gridCountSelect.value);
+            const urls = {};
+            document.querySelectorAll('#grid-container input[type="url"]').forEach((input, index) => {
+                urls[index + 1] = input.value.trim();
+            });
+            localStorage.setItem(CONFIG_KEY, JSON.stringify({ count, urls }));
+        }
+
+        // 事件监听
+        gridCountSelect.addEventListener('change', (e) => {
+            initGrid(parseInt(e.target.value));
+            saveConfig();
+        });
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem(CONFIG_KEY);
+            initGrid(parseInt(gridCountSelect.value));
+        });
+
+        // 初始化
+        init();
+    </script>
+</body>
+</html>
